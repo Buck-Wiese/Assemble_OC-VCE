@@ -145,9 +145,95 @@ triplicate_data_corr_means<-triplicate_data_corr %>%
   group_by(Standard_concentration, Sample, Monomer)%>%
   summarize(mean_int_corr=mean(as.numeric(Intensity_corr)), std_dev_corr=sd(as.numeric(Intensity_corr)), n=n())
   
+
+
+# Turn sample names into metadata -----------------------------------------
+meta_temp=data.frame(plant=character(),
+                     timepoint=character(),
+                     treatment=character(), 
+                     time_treat=character())
+
+plant_temp=character()
+timepoint_temp=character()
+treatmeant_temp=character()
+time_treat_temp=character()
+
+for (i in 1:length(triplicate_data_corr_means$Standard_concentration)){
+  if (grepl(triplicate_data_corr_means$Sample[i], pattern = "-")){
+  name_parts_temp<-unlist(str_split(triplicate_data_corr_means$Sample[i], "-"))
+  if (name_parts_temp[1]=="A"){
+    plant_temp<-"Fucus"  
+  }
   
+  if (name_parts_temp[1]=="S"){
+    plant_temp<-"Zostera"
+  }
   
+  if (grepl(name_parts_temp[2], pattern="I$")){
+    timepoint_temp<-"initial"
+    time_treat_temp<-"initial"
+  }
   
+  if (grepl(name_parts_temp[2], pattern="E$")){
+    timepoint_temp<-"end"
+    name_subparts_temp<-unlist(strsplit(name_parts_temp[2], split=""))
+  if(name_subparts_temp[3]<=3){
+    treatment_temp="light"
+    time_treat_temp<-"end_light"
+  }
+  if(name_subparts_temp[3]>=4){
+    treatment_temp="dark"
+    time_treat_temp<-"end_dark"
+  }
+  
+  }
+  }
+  else {
+    plant_temp<-"none"
+    timepoint_temp<-"none"
+    treatment_temp<-"none"
+    time_treat_temp<-"none"
+  }
+  meta_temp<-rbind(meta_temp, c(as.character(plant_temp), as.character(timepoint_temp), 
+                                as.character(treatment_temp), as.character(time_treat_temp)))
+  colnames(meta_temp)<-c("plant", "timepoint", "treatment", "time_treat_temp")
+}
+
+triplicate_data_corr_means$Plant<-meta_temp$plant
+triplicate_data_corr_means$Timepoint<-meta_temp$timepoint  
+triplicate_data_corr_means$Treatment<-meta_temp$treatment 
+triplicate_data_corr_means$Time_treat<-meta_temp$time_treat_temp
+
+# plotting corrected means by plant ---------------------------------------
+time_cat_colors<-c(scico(1, palette = "cork",begin=0.6,end=0.7, alpha=0.8),
+                   scico(1, palette = "davos",begin=0.1,end=0.2, alpha=0.8),
+                   scico(1, palette = "lajolla",begin=0.2,end=0.3, alpha=0.8))
+
+triplicate_data_corr_means$Monomer<-factor(triplicate_data_corr_means$Monomer,
+              levels=c("Fucose", "Rhamnose","Galactosamine","Arabinose","Glucosamine",
+                       "Galactose","Glucose","Mannose","Xylose",
+                       "Gluconic_acid","Muramic_acid","Galacturonic_acid",
+                       "Glucuronic_acid","Mannuronic_acid","Iduronic_acid"))
+
+ggplot(data=triplicate_data_corr_means[triplicate_data_corr_means$Plant!="none",])+
+  geom_bar(aes(x=Monomer, y=mean_int_corr, fill=Time_treat),
+           position = position_dodge(), stat = "summary", colour="black")+
+  geom_point(aes(x=Monomer, y=mean_int_corr, fill=Time_treat), 
+             position = position_dodge(.9), pch=21, size=2)+
+  scale_x_discrete(name="Monosaccharide", 
+                   labels=c("fucose", "rhamnose","galactosamine","arabinose","glucosamine",
+                            "galactose","glucose","mannose\n(bad separation)","xylose",
+                            "gluconic\nacid","muramic\nacid","galacturonic\nacid",
+                            "glucuronic\nacid","mannuronic\nacid","iduronic\nacid"))+
+  scale_y_continuous(name=expression(paste(Concentration~(microg~L^-1))))+
+  scale_fill_manual(name=NULL,  breaks=c("initial", "end_dark", "end_light"),
+                    labels=c("before incubation",
+                                         "incubation in dark",
+                                         "incubation in light"),
+                    values = time_cat_colors)+
+  facet_grid(rows="Plant")+
+  theme_bw()
+
 
 #Seagrass WC
 Samples <- rbind(SG_WC<-triplicate_data[grepl(pattern = "^S-", triplicate_data$Sample),],
